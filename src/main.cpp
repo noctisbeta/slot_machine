@@ -3,11 +3,16 @@
 #include "SlotMachine.h"
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+#include <cmath>
 #include <cstdlib>
 #include <ctime>
 #include <functional>
 #include <iostream>
 #include <vector>
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
   glViewport(0, 0, width, height);
@@ -30,80 +35,104 @@ void processInput(GLFWwindow *window,
   }
 }
 
-void renderTriangle(const float leftCorner, const float sideLength, float r,
-                    float g, float b) {
-  Shader vertexShader("assets/vertex_shader.glsl", Shader::VERTEX_SHADER);
-  Shader fragmentShader("assets/fragment_shader.glsl", Shader::FRAGMENT_SHADER);
+void renderPrimitive(const std::vector<float> &vertices, GLenum drawMode,
+                     Color color, const char *vertexShaderPath,
+                     const char *fragmentShaderPath) {
+  if (vertices.empty() || (vertices.size() % 3 != 0)) {
+    std::cerr
+        << "Error: Vertex data for primitive is empty or not a multiple of 3."
+        << std::endl;
+    return;
+  }
 
+  Shader vertexShader(vertexShaderPath, Shader::VERTEX_SHADER);
+  Shader fragmentShader(fragmentShaderPath, Shader::FRAGMENT_SHADER);
   ShaderProgram shaderProgram;
 
   if (!shaderProgram.create()) {
-    std::cerr << "Failed to create shader program." << std::endl;
+    std::cerr << "Failed to create shader program for primitive." << std::endl;
     return;
   }
 
   shaderProgram.associateShaders({vertexShader, fragmentShader});
 
   if (!shaderProgram.link()) {
-    std::cerr << "Failed to link shader program." << std::endl;
+    std::cerr << "Failed to link shader program for primitive." << std::endl;
     return;
   }
-
-  // 5. Vertex Buffer Object (VBO) and Vertex Array Object (VAO)
-  float vertices[] = {
-      leftCorner,
-      -0.5f,
-      0.0f, //
-      leftCorner + sideLength,
-      -0.5f,
-      0.0f, //
-      leftCorner + sideLength / 2.0f,
-      0.5f,
-      0.0f //
-  };
 
   unsigned int VBO, VAO;
   glGenVertexArrays(1, &VAO);
   glGenBuffers(1, &VBO);
 
-  glBindVertexArray(VAO); // Bind VAO
+  glBindVertexArray(VAO);
 
-  glBindBuffer(GL_ARRAY_BUFFER, VBO); // Bind VBO
-  glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices,
-               GL_STATIC_DRAW); // Copy vertex data to VBO
+  glBindBuffer(GL_ARRAY_BUFFER, VBO);
+  glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float),
+               vertices.data(), GL_STATIC_DRAW);
 
-  // 6. Configure Vertex Attributes
-  // Tell OpenGL how to interpret the vertex data (for layout location 0)
   glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *)0);
-  glEnableVertexAttribArray(0); // Enable vertex attribute at location 0
+  glEnableVertexAttribArray(0);
 
-  // Unbind VBO (VAO still has it registered)
   glBindBuffer(GL_ARRAY_BUFFER, 0);
-  // Unbind VAO (optional here, but good practice if other objects were to be
-  // bound) glBindVertexArray(0);
 
-  // 7. Draw the triangle
-  glUseProgram(shaderProgram.getID()); // Use our shader program
+  glUseProgram(shaderProgram.getID());
 
-  // Set the color uniform
-  int triangleColorLocation =
-      glGetUniformLocation(shaderProgram.getID(), "triangleColor");
-  if (triangleColorLocation == -1) {
-    std::cerr << "Warning: Could not find uniform 'triangleColor'" << std::endl;
+  int colorLocation =
+      glGetUniformLocation(shaderProgram.getID(),
+                           "triangleColor"); // Assuming "triangleColor" uniform
+  if (colorLocation == -1) {
+    std::cerr << "Warning: Could not find uniform 'triangleColor' for primitive"
+              << std::endl;
   } else {
-    glUniform3f(triangleColorLocation, r, g, b);
+    glUniform3f(colorLocation, color.r, color.g, color.b);
   }
 
-  glBindVertexArray(
-      VAO); // Bind the VAO (which has our VBO and attribute configuration)
-  glDrawArrays(GL_TRIANGLES, 0, 3); // Draw the triangle (3 vertices)
+  glBindVertexArray(VAO);
+  glDrawArrays(drawMode, 0, static_cast<GLsizei>(vertices.size() / 3));
 
-  // 8. Cleanup (IMPORTANT: because we create these every frame in this
-  // function) This is inefficient. Ideally, create these once and delete them
-  // at program exit.
+  // Cleanup
   glDeleteVertexArrays(1, &VAO);
   glDeleteBuffers(1, &VBO);
   glDeleteProgram(shaderProgram.getID());
+}
+
+void renderTriangle(const float leftCorner, const float sideLength,
+                    Color color) {
+  std::vector<float> vertices = {leftCorner,
+                                 -0.8f,
+                                 0.0f,
+                                 leftCorner + sideLength,
+                                 -0.8f,
+                                 0.0f,
+                                 leftCorner + sideLength / 2.0f,
+                                 0.0f,
+                                 0.0f};
+
+  renderPrimitive(vertices, GL_TRIANGLES, color, "assets/vertex_shader.glsl",
+                  "assets/fragment_shader.glsl");
+}
+
+void renderCircle(float centerX, float centerY, float radius, int numSegments,
+                  Color color) {
+  std::vector<float> vertices;
+
+  // Center vertex
+  vertices.push_back(centerX);
+  vertices.push_back(centerY);
+  vertices.push_back(0.0f);
+
+  // Circumference vertices
+  for (int i = 0; i <= numSegments; ++i) {
+    float angle = 2.0f * static_cast<float>(M_PI) * static_cast<float>(i) /
+                  static_cast<float>(numSegments);
+    vertices.push_back(centerX + radius * std::cos(angle));
+    vertices.push_back(centerY + radius * std::sin(angle));
+    vertices.push_back(0.0f);
+  }
+
+  renderPrimitive(vertices, GL_TRIANGLE_FAN, color, "assets/vertex_shader.glsl",
+                  "assets/fragment_shader.glsl");
 }
 
 int main(void) {
@@ -118,7 +147,7 @@ int main(void) {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-  window = glfwCreateWindow(800, 600, "Slot Machine Colors", NULL, NULL);
+  window = glfwCreateWindow(800, 800, "Slot Machine Colors", NULL, NULL);
   if (!window) {
     glfwTerminate();
     return -1;
@@ -134,7 +163,7 @@ int main(void) {
     return -1;
   }
 
-  glViewport(0, 0, 800, 600);
+  glViewport(0, 0, 800, 800);
   glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
   bool spaceActionRequested = false;
@@ -158,10 +187,13 @@ int main(void) {
     Color color;
     for (int i = 0; i < 3; ++i) {
       color = reelColors[i];
-      float r = color.r;
-      float g = color.g;
-      float b = color.b;
-      renderTriangle(-0.9f + i * 0.6f, 0.5f, r, g, b);
+      renderTriangle(-0.9f + i * 0.6f, 0.5f, color);
+    }
+
+    for (int i = 0; i < 10; ++i) {
+      float x = -0.8f + i * 0.16f;
+      float y = 0.6f;
+      renderCircle(x, y, 0.05f, 36, Color{1.0f, 1.0f, 0.0f});
     }
 
     glfwPollEvents();
