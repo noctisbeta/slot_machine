@@ -7,7 +7,12 @@ find_package(glfw3 REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(glm REQUIRED)
 
-add_executable(slot_machine src/main.cpp src/Shader.cpp src/ShaderProgram.cpp)
+add_executable(slot_machine 
+    src/main.cpp
+    src/Shader.cpp
+    src/ShaderProgram.cpp
+    src/SlotMachine.cpp
+)
 
 target_link_libraries(slot_machine PRIVATE glfw GLEW::GLEW glm::glm)
 

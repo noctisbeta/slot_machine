@@ -1,20 +1,33 @@
 #include "Shader.h"
 #include "ShaderProgram.h"
+#include "SlotMachine.h"
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+#include <cstdlib>
+#include <ctime>
+#include <functional>
 #include <iostream>
+#include <vector>
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
   glViewport(0, 0, width, height);
 }
 
-void processInput(GLFWwindow *window, float *corner) {
+void processInput(GLFWwindow *window,
+                  std::function<void()> onSpacePressCallback) {
+  static bool space_key_processed_this_press = false;
+
   if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
     glfwSetWindowShouldClose(window, true);
-  if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
-    *corner += 0.01f;
-  if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
-    *corner -= 0.01f;
+
+  if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
+    if (onSpacePressCallback && !space_key_processed_this_press) {
+      onSpacePressCallback();
+      space_key_processed_this_press = true;
+    }
+  } else {
+    space_key_processed_this_press = false;
+  }
 }
 
 void renderTriangle(const float leftCorner, const float sideLength, float r,
@@ -94,6 +107,8 @@ void renderTriangle(const float leftCorner, const float sideLength, float r,
 }
 
 int main(void) {
+  srand(static_cast<unsigned int>(time(0)));
+
   GLFWwindow *window;
 
   if (!glfwInit())
@@ -103,7 +118,7 @@ int main(void) {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-  window = glfwCreateWindow(800, 600, "Hello World", NULL, NULL);
+  window = glfwCreateWindow(800, 600, "Slot Machine Colors", NULL, NULL);
   if (!window) {
     glfwTerminate();
     return -1;
@@ -122,16 +137,30 @@ int main(void) {
   glViewport(0, 0, 800, 600);
   glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
-  float corner = -0.7f;
+  bool spaceActionRequested = false;
+
+  SlotMachine slotMachine;
+
+  auto spaceKeyPressCallback = [&]() { spaceActionRequested = true; };
+
   while (!glfwWindowShouldClose(window)) {
-    processInput(window, &corner);
+    processInput(window, spaceKeyPressCallback);
+
+    if (spaceActionRequested) {
+      slotMachine.spin();
+      spaceActionRequested = false;
+    }
 
     glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    renderTriangle(-0.9f, 0.6f, 1.0f, 0.4f, 0.4f);
-    renderTriangle(-0.3f, 0.6f, 0.4f, 1.0f, 0.4f);
-    renderTriangle(0.3f, 0.6f, 0.4f, 0.4f, 1.0f);
+    const auto &reelColors = slotMachine.getReelColors();
+    for (int i = 0; i < 3; ++i) {
+      float r = reelColors[i * 3];
+      float g = reelColors[i * 3 + 1];
+      float b = reelColors[i * 3 + 2];
+      renderTriangle(-0.9f + i * 0.6f, 0.5f, r, g, b);
+    }
 
     glfwPollEvents();
     glfwSwapBuffers(window);
