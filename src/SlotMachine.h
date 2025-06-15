@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Color.h"
 #include <array>
 
 class SlotMachine {
@@ -8,11 +9,11 @@ public:
   ~SlotMachine();
 
   void spin();
-  std::array<float, 9> getReelColors() const { return reelColors; }
+  std::array<Color, 3> getReelColors() const { return reelColors; }
 
-  static const std::array<float, 24> masterAvailableColors;
+  static const std::array<Color, 8> masterAvailableColors;
 
 private:
-  std::array<float, 9> reelColors;
+  std::array<Color, 3> reelColors;
   void changeReelColors();
 };

@@ -155,10 +155,12 @@ int main(void) {
     glClear(GL_COLOR_BUFFER_BIT);
 
     const auto &reelColors = slotMachine.getReelColors();
+    Color color;
     for (int i = 0; i < 3; ++i) {
-      float r = reelColors[i * 3];
-      float g = reelColors[i * 3 + 1];
-      float b = reelColors[i * 3 + 2];
+      color = reelColors[i];
+      float r = color.r;
+      float g = color.g;
+      float b = color.b;
       renderTriangle(-0.9f + i * 0.6f, 0.5f, r, g, b);
     }
 
